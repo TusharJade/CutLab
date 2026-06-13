@@ -1,0 +1,76 @@
+/*
+ * Single source of truth for design tokens.
+ * Only the font-size tokens below are allowed for typography.
+ * Colors must be referenced only from here.
+ */
+
+:root {
+  /* Typography scale (mandated) */
+  --font-size-xxs: 0.5625rem; /* 9px */
+  --font-size-xs: 0.625rem; /* 10px */
+  --font-size-sm: 0.6875rem; /* 11px */
+  --font-size-md: 0.75rem; /* 12px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-lg: 1rem; /* 16px */
+  --font-size-xl: 1.125rem; /* 18px */
+  --font-size-2xl: 1.25rem; /* 20px */
+
+  /* Dark palette (default) */
+  --canvas: #0b0d12;
+  --panel: #141821;
+  --panel-2: #1b2029;
+  --panel-3: #232934;
+  --border: #2a313d;
+  --border-strong: #3a414f;
+  --fg: #e7eaf0;
+  --muted: #9aa3b2;
+  --muted-2: #6b7382;
+  --primary: #3b82f6;
+  --primary-hover: #2f73e6;
+  --primary-fg: #ffffff;
+  --accent: #8b5cf6;
+  --danger: #ef4444;
+  --success: #22c55e;
+
+  /* Editor surfaces */
+  --track-video: #2563eb;
+  --track-audio: #0ea5a4;
+  --track-image: #a855f7;
+  --track-text: #f59e0b;
+  --clip-border: #3a414f;
+  --clip-selected: #3b82f6;
+  --waveform: #5eead4;
+  --ruler: #2a313d;
+  --playhead: #f43f5e;
+  --shadow: rgba(0, 0, 0, 0.45);
+}
+
+:root.light {
+  /* Light palette overrides */
+  --canvas: #eef1f5;
+  --panel: #ffffff;
+  --panel-2: #f4f6f9;
+  --panel-3: #e9edf2;
+  --border: #dde2e9;
+  --border-strong: #c5ccd6;
+  --fg: #1a1f29;
+  --muted: #5b6472;
+  --muted-2: #8a93a3;
+  --primary: #2f73e6;
+  --primary-hover: #2563eb;
+  --primary-fg: #ffffff;
+  --accent: #7c3aed;
+  --danger: #dc2626;
+  --success: #16a34a;
+
+  --track-video: #2563eb;
+  --track-audio: #0d9488;
+  --track-image: #9333ea;
+  --track-text: #d97706;
+  --clip-border: #c5ccd6;
+  --clip-selected: #2f73e6;
+  --waveform: #0d9488;
+  --ruler: #dde2e9;
+  --playhead: #e11d48;
+  --shadow: rgba(15, 23, 42, 0.15);
+}
