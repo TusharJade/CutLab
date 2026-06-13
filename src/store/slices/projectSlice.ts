@@ -35,6 +35,15 @@ const projectSlice = createSlice({
   name: 'project',
   initialState,
   reducers: {
+    setCompositionSize(
+      state,
+      action: PayloadAction<{ width: number; height: number }>,
+    ) {
+      if (action.payload.width > 0 && action.payload.height > 0) {
+        state.width = Math.round(action.payload.width)
+        state.height = Math.round(action.payload.height)
+      }
+    },
     addTrack: {
       reducer(state, action: PayloadAction<{ id: string; type: TrackType }>) {
         const { id, type } = action.payload
@@ -204,6 +213,7 @@ const projectSlice = createSlice({
 })
 
 export const {
+  setCompositionSize,
   addTrack,
   removeTrack,
   moveTrack,

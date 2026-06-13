@@ -15,13 +15,13 @@ import type { Clip, EasingType } from '../../types'
 import { createId } from '../../utils/id'
 import { CopyIcon, PlusIcon, TrashIcon } from '../icons'
 import {
-  ColorField,
+  ColorInput,
   FieldRow,
-  NumberField,
+  NumberInput,
   SectionTitle,
-  SliderField,
-  ToggleField,
-} from '../ui/Field'
+  Slider,
+  Toggle,
+} from '../ui'
 
 const EASINGS: EasingType[] = ['linear', 'easeIn', 'easeOut', 'easeInOut']
 
@@ -120,14 +120,14 @@ export function Inspector() {
         {/* Timing */}
         <SectionTitle>Timing</SectionTitle>
         <FieldRow label="Start (frame)">
-          <NumberField
+          <NumberInput
             value={clip.startFrame}
             min={0}
             onChange={(value) => setClip({ startFrame: Math.max(0, value) })}
           />
         </FieldRow>
         <FieldRow label="Duration (frame)">
-          <NumberField
+          <NumberInput
             value={clip.durationInFrames}
             min={1}
             onChange={(value) => setClip({ durationInFrames: Math.max(1, value) })}
@@ -136,7 +136,7 @@ export function Inspector() {
         {clip.type !== 'image' && (
           <>
             <FieldRow label="Trim in">
-              <NumberField
+              <NumberInput
                 value={clip.trimStartFrame}
                 min={0}
                 onChange={(value) =>
@@ -150,7 +150,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Trim out">
-              <NumberField
+              <NumberInput
                 value={clip.trimEndFrame}
                 min={1}
                 onChange={(value) =>
@@ -161,7 +161,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Speed">
-              <NumberField
+              <NumberInput
                 value={clip.speed}
                 step={0.25}
                 min={0.25}
@@ -174,7 +174,7 @@ export function Inspector() {
         )}
         {clip.type === 'video' && (
           <FieldRow label="Reverse">
-            <ToggleField
+            <Toggle
               checked={clip.reverse}
               onChange={(checked) => setClip({ reverse: checked })}
             />
@@ -186,13 +186,13 @@ export function Inspector() {
           <>
             <SectionTitle>Audio</SectionTitle>
             <FieldRow label="Mute">
-              <ToggleField
+              <Toggle
                 checked={clip.muted}
                 onChange={(checked) => setClip({ muted: checked })}
               />
             </FieldRow>
             <FieldRow label="Volume">
-              <SliderField
+              <Slider
                 value={clip.volume}
                 min={0}
                 max={1}
@@ -200,14 +200,14 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Fade in (frame)">
-              <NumberField
+              <NumberInput
                 value={clip.fadeInFrames}
                 min={0}
                 onChange={(value) => setClip({ fadeInFrames: Math.max(0, value) })}
               />
             </FieldRow>
             <FieldRow label="Fade out (frame)">
-              <NumberField
+              <NumberInput
                 value={clip.fadeOutFrames}
                 min={0}
                 onChange={(value) => setClip({ fadeOutFrames: Math.max(0, value) })}
@@ -221,7 +221,7 @@ export function Inspector() {
           <>
             <SectionTitle>Transform</SectionTitle>
             <FieldRow label="Scale">
-              <NumberField
+              <NumberInput
                 value={clip.transform.scale}
                 step={0.05}
                 min={0.1}
@@ -229,21 +229,21 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Pan X">
-              <NumberField
+              <NumberInput
                 value={clip.transform.translateX}
                 step={5}
                 onChange={(value) => setTransform({ translateX: value })}
               />
             </FieldRow>
             <FieldRow label="Pan Y">
-              <NumberField
+              <NumberInput
                 value={clip.transform.translateY}
                 step={5}
                 onChange={(value) => setTransform({ translateY: value })}
               />
             </FieldRow>
             <FieldRow label="Padding (px)">
-              <NumberField
+              <NumberInput
                 value={clip.transform.padding}
                 min={0}
                 step={2}
@@ -253,7 +253,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Padding color">
-              <ColorField
+              <ColorInput
                 value={clip.transform.paddingColor}
                 onChange={(value) => setTransform({ paddingColor: value })}
               />
@@ -261,7 +261,7 @@ export function Inspector() {
 
             <SectionTitle>Crop (0–1)</SectionTitle>
             <FieldRow label="Crop X">
-              <NumberField
+              <NumberInput
                 value={clip.transform.crop.x}
                 step={0.05}
                 min={0}
@@ -272,7 +272,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Crop Y">
-              <NumberField
+              <NumberInput
                 value={clip.transform.crop.y}
                 step={0.05}
                 min={0}
@@ -283,7 +283,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Crop W">
-              <NumberField
+              <NumberInput
                 value={clip.transform.crop.width}
                 step={0.05}
                 min={0.05}
@@ -294,7 +294,7 @@ export function Inspector() {
               />
             </FieldRow>
             <FieldRow label="Crop H">
-              <NumberField
+              <NumberInput
                 value={clip.transform.crop.height}
                 step={0.05}
                 min={0.05}
@@ -356,7 +356,7 @@ export function Inspector() {
                       </button>
                     </div>
                     <FieldRow label="Frame">
-                      <NumberField
+                      <NumberInput
                         value={keyframe.frame}
                         min={0}
                         max={clip.durationInFrames}
@@ -372,7 +372,7 @@ export function Inspector() {
                       />
                     </FieldRow>
                     <FieldRow label="Scale">
-                      <NumberField
+                      <NumberInput
                         value={keyframe.props.scale}
                         step={0.05}
                         min={0.1}
@@ -388,7 +388,7 @@ export function Inspector() {
                       />
                     </FieldRow>
                     <FieldRow label="Pan X">
-                      <NumberField
+                      <NumberInput
                         value={keyframe.props.translateX}
                         step={5}
                         onChange={(value) =>
@@ -405,7 +405,7 @@ export function Inspector() {
                       />
                     </FieldRow>
                     <FieldRow label="Pan Y">
-                      <NumberField
+                      <NumberInput
                         value={keyframe.props.translateY}
                         step={5}
                         onChange={(value) =>
@@ -422,7 +422,7 @@ export function Inspector() {
                       />
                     </FieldRow>
                     <FieldRow label="Opacity">
-                      <SliderField
+                      <Slider
                         value={keyframe.props.opacity}
                         min={0}
                         max={1}

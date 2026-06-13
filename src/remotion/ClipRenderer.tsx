@@ -1,11 +1,5 @@
-import {
-  AbsoluteFill,
-  Audio,
-  Img,
-  OffthreadVideo,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion'
+import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from 'remotion'
+import { Audio, Video } from '@remotion/media'
 import type { Clip, MediaAsset } from '../types'
 import { resolveKeyframeProps } from './interpolateKeyframes'
 
@@ -57,7 +51,6 @@ function VisualClip({ clip, media }: ClipRendererProps) {
     height: `${100 / cropHeight}%`,
     left: `${(-crop.x / cropWidth) * 100}%`,
     top: `${(-crop.y / cropHeight) * 100}%`,
-    objectFit: 'cover',
   }
 
   return (
@@ -79,7 +72,10 @@ function VisualClip({ clip, media }: ClipRendererProps) {
         >
           <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
             {clip.type === 'image' ? (
-              <Img src={media.objectUrl} style={mediaStyle} />
+              <Img
+                src={media.objectUrl}
+                style={{ ...mediaStyle, objectFit: 'cover' }}
+              />
             ) : (
               <ForwardOrReverseVideo clip={clip} media={media} style={mediaStyle} />
             )}
@@ -105,12 +101,13 @@ function ForwardOrReverseVideo({
 
   if (!clip.reverse) {
     return (
-      <OffthreadVideo
+      <Video
         src={media.objectUrl}
         trimBefore={clip.trimStartFrame}
         trimAfter={clip.trimEndFrame}
         playbackRate={clip.speed}
         volume={volume}
+        objectFit="cover"
         style={style}
       />
     )
@@ -123,10 +120,11 @@ function ForwardOrReverseVideo({
   )
 
   return (
-    <OffthreadVideo
+    <Video
       src={media.objectUrl}
       trimBefore={trimBefore}
       volume={volume}
+      objectFit="cover"
       style={style}
     />
   )

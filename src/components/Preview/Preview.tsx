@@ -1,56 +1,27 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Player, type PlayerRef } from '@remotion/player'
 import { useSelector } from 'react-redux'
-import { Main, type MainProps } from '../../remotion/Main'
+import { Main } from '../../remotion/Main'
 import { useAppDispatch } from '../../store/hooks'
 import {
   selectClips,
-  selectCompositionHeight,
-  selectCompositionWidth,
-  selectFps,
   selectIsPlaying,
-  selectMediaAssets,
   selectPlayheadFrame,
-  selectProjectDurationInFrames,
-  selectTracks,
 } from '../../store/selectors'
 import { setIsPlaying, setPlayheadFrame } from '../../store/slices/editorSlice'
-import type { MediaAsset } from '../../types'
+import { useCompositionProps } from '../../hooks/useCompositionProps'
 import { framesToTimecode } from '../../utils/format'
 import { PauseIcon, PlayIcon } from '../icons'
 
-const COMPOSITION_BACKGROUND = '#000000'
-
 export function Preview() {
   const dispatch = useAppDispatch()
-  const tracks = useSelector(selectTracks)
   const clips = useSelector(selectClips)
-  const assets = useSelector(selectMediaAssets)
-  const fps = useSelector(selectFps)
-  const width = useSelector(selectCompositionWidth)
-  const height = useSelector(selectCompositionHeight)
-  const durationInFrames = useSelector(selectProjectDurationInFrames)
   const playheadFrame = useSelector(selectPlayheadFrame)
   const isPlaying = useSelector(selectIsPlaying)
+  const { inputProps, durationInFrames, width, height, fps } =
+    useCompositionProps()
 
   const playerRef = useRef<PlayerRef>(null)
-
-  const mediaRecord = useMemo(() => {
-    return assets.reduce<Record<string, MediaAsset>>((record, asset) => {
-      record[asset.id] = asset
-      return record
-    }, {})
-  }, [assets])
-
-  const inputProps = useMemo<MainProps>(
-    () => ({
-      tracks,
-      clips,
-      media: mediaRecord,
-      backgroundColor: COMPOSITION_BACKGROUND,
-    }),
-    [tracks, clips, mediaRecord],
-  )
 
   useEffect(() => {
     const player = playerRef.current

@@ -1,6 +1,6 @@
 import type { MediaAsset, TrackType } from '../types'
 import { createClipFromMedia, mediaTypeToTrackType } from '../utils/factory'
-import { addClip, addTrack } from './slices/projectSlice'
+import { addClip, addTrack, setCompositionSize } from './slices/projectSlice'
 import { selectClip } from './slices/editorSlice'
 import type { AppDispatch, RootState } from './index'
 
@@ -13,6 +13,16 @@ export function addMediaToTimeline(media: MediaAsset) {
   return (dispatch: AppDispatch, getState: () => RootState) => {
     const trackType: TrackType = mediaTypeToTrackType(media.type)
     let state = getState()
+
+    // On first import, match the composition to the media so it fills the
+    // preview instead of being letterboxed/cropped inside a mismatched canvas.
+    const isFirstClip = Object.keys(state.project.clips).length === 0
+    if (isFirstClip && media.type !== 'audio') {
+      dispatch(
+        setCompositionSize({ width: media.width, height: media.height }),
+      )
+    }
+
     let track = [...state.project.tracks]
       .reverse()
       .find((item) => item.type === trackType)
