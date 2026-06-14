@@ -2,14 +2,23 @@ import { AbsoluteFill, Sequence } from 'remotion'
 import type { Clip, MediaAsset, Track } from '../types'
 import { ClipRenderer } from './ClipRenderer'
 
+export type RenderMode = 'preview' | 'export'
+
 export type MainProps = {
   tracks: Track[]
   clips: Record<string, Clip>
   media: Record<string, MediaAsset>
   backgroundColor: string
+  renderMode?: RenderMode
 }
 
-export function Main({ tracks, clips, media, backgroundColor }: MainProps) {
+export function Main({
+  tracks,
+  clips,
+  media,
+  backgroundColor,
+  renderMode = 'preview',
+}: MainProps) {
   // Render last track first so the topmost timeline track paints on top.
   const orderedTracks = [...tracks].reverse()
 
@@ -28,7 +37,11 @@ export function Main({ tracks, clips, media, backgroundColor }: MainProps) {
               durationInFrames={clip.durationInFrames}
               layout="none"
             >
-              <ClipRenderer clip={clip} media={asset} />
+              <ClipRenderer
+                clip={clip}
+                media={asset}
+                renderMode={renderMode}
+              />
             </Sequence>
           )
         }),

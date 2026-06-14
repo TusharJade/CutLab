@@ -20,6 +20,7 @@ export async function exportProjectToMp4({
   onProgress,
   signal,
 }: ExportArgs): Promise<void> {
+  const exportProps: MainProps = { ...inputProps, renderMode: 'export' }
   const result = await renderMediaOnWeb({
     composition: {
       component: Main,
@@ -28,9 +29,9 @@ export async function exportProjectToMp4({
       height,
       fps,
       durationInFrames,
-      defaultProps: inputProps,
+      defaultProps: exportProps,
     },
-    inputProps,
+    inputProps: exportProps,
     container: 'mp4',
     videoCodec: 'h264',
     onProgress: onProgress

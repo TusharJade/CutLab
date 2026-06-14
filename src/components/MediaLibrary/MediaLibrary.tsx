@@ -9,10 +9,9 @@ import { createMediaAsset } from '../../utils/media'
 import { formatSeconds } from '../../utils/format'
 import {
   AudioIcon,
+  CloudUploadIcon,
   ImageIcon,
-  PlusIcon,
   TrashIcon,
-  UploadIcon,
   VideoIcon,
 } from '../icons'
 
@@ -28,14 +27,63 @@ function MediaThumbnail({ asset }: { asset: MediaAsset }) {
       <img
         src={asset.thumbnailUrl}
         alt={asset.name}
-        className="h-12 w-16 shrink-0 rounded object-cover"
+        className="h-full w-full object-cover"
       />
     )
   }
   const Icon = TYPE_ICON[asset.type]
   return (
-    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded bg-panel-3 text-muted">
-      <Icon width={18} height={18} />
+    <div className="flex h-full w-full items-center justify-center bg-panel-3 text-muted">
+      <Icon width={22} height={22} />
+    </div>
+  )
+}
+
+function MediaCard({
+  asset,
+  onAdd,
+  onRemove,
+}: {
+  asset: MediaAsset
+  onAdd: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      title="Add to timeline"
+      onClick={onAdd}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onAdd()
+        }
+      }}
+      className="group flex cursor-pointer flex-col gap-1.5 rounded-lg border border-border bg-panel-2 p-1.5 transition-colors hover:border-border-strong"
+    >
+      <div className="relative aspect-video w-full overflow-hidden rounded-md bg-panel-3">
+        <MediaThumbnail asset={asset} />
+        {asset.type !== 'image' && (
+          <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1 text-xxs font-medium text-white">
+            {formatSeconds(asset.naturalDurationSeconds)}
+          </span>
+        )}
+        <button
+          type="button"
+          title="Remove media"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded bg-black/55 text-white opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+        >
+          <TrashIcon width={13} height={13} />
+        </button>
+      </div>
+      <p className="truncate text-sm font-medium" title={asset.name}>
+        {asset.name}
+      </p>
     </div>
   )
 }
@@ -53,38 +101,25 @@ export function MediaLibrary() {
       const asset = await createMediaAsset(file)
       if (asset) {
         dispatch(addMediaAsset(asset))
+        dispatch(addMediaToTimeline(asset))
       }
     }
     setIsImporting(false)
   }
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-panel">
-      <div className="flex h-9 items-center justify-between border-b border-border px-3">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-panel">
+      <div className="flex h-9 items-center border-b border-border px-3">
         <span className="text-sm font-semibold uppercase tracking-wider text-muted">
           Media
         </span>
-        <label className="flex cursor-pointer items-center gap-1 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-fg transition-colors hover:bg-primary-hover">
-          <PlusIcon width={12} height={12} />
-          Add
-          <input
-            type="file"
-            accept="video/*,audio/*,image/*"
-            multiple
-            className="hidden"
-            onChange={(event) => {
-              void importFiles(event.target.files)
-              event.target.value = ''
-            }}
-          />
-        </label>
       </div>
 
-      <div
-        className={`m-3 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-6 text-center transition-colors ${
+      <label
+        className={`m-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-7 text-center transition-colors ${
           isDragging
-            ? 'border-primary bg-primary/10'
-            : 'border-border text-muted'
+            ? 'border-primary bg-primary/10 text-fg'
+            : 'border-border text-muted hover:border-border-strong hover:text-fg'
         }`}
         onDragOver={(event) => {
           event.preventDefault()
@@ -97,54 +132,41 @@ export function MediaLibrary() {
           void importFiles(event.dataTransfer.files)
         }}
       >
-        <UploadIcon width={20} height={20} />
-        <p className="px-4 text-xs leading-tight">
-          {isImporting ? 'Importing…' : 'Drop video, audio or images here'}
-        </p>
-      </div>
+        <CloudUploadIcon width={28} height={28} />
+        <div className="px-4 leading-tight">
+          <p className="text-base font-semibold text-fg">
+            {isImporting ? 'Importing…' : 'Click to upload'}
+          </p>
+          <p className="text-sm text-muted">or drag &amp; drop file here</p>
+        </div>
+        <input
+          type="file"
+          accept="video/*,audio/*,image/*"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            void importFiles(event.target.files)
+            event.target.value = ''
+          }}
+        />
+      </label>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {assets.length === 0 ? (
-          <p className="mt-4 text-center text-xs text-muted-2">
-            No media yet. Add files to get started.
+          <p className="mt-4 text-center text-sm text-muted-2">
+            No media yet. Upload files to get started.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {assets.map((asset) => (
-              <li
+              <MediaCard
                 key={asset.id}
-                className="group flex items-center gap-2 rounded-lg border border-border bg-panel-2 p-2 transition-colors hover:border-border-strong"
-              >
-                <MediaThumbnail asset={asset} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{asset.name}</p>
-                  <p className="text-xxs uppercase tracking-wider text-muted-2">
-                    {asset.type}
-                    {asset.type !== 'image' &&
-                      ` · ${formatSeconds(asset.naturalDurationSeconds)}`}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    title="Add to timeline"
-                    onClick={() => dispatch(addMediaToTimeline(asset))}
-                    className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-fg transition-colors hover:bg-primary-hover"
-                  >
-                    <PlusIcon width={12} height={12} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Remove media"
-                    onClick={() => dispatch(removeMediaAsset(asset.id))}
-                    className="flex h-6 w-6 items-center justify-center rounded bg-panel-3 text-muted transition-colors hover:text-danger"
-                  >
-                    <TrashIcon width={12} height={12} />
-                  </button>
-                </div>
-              </li>
+                asset={asset}
+                onAdd={() => dispatch(addMediaToTimeline(asset))}
+                onRemove={() => dispatch(removeMediaAsset(asset.id))}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </aside>

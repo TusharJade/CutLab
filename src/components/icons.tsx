@@ -102,6 +102,13 @@ export const UploadIcon = (props: IconProps) => (
   </svg>
 )
 
+export const CloudUploadIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M16 16l-4-4-4 4M12 12v9" />
+    <path d="M20.4 14.9A5 5 0 0 0 18 5.5h-1.3A8 8 0 1 0 3 13.3" />
+  </svg>
+)
+
 export const DownloadIcon = (props: IconProps) => (
   <svg {...base(props)}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
@@ -119,5 +126,17 @@ export const ScissorsIcon = (props: IconProps) => (
     <circle cx="6" cy="6" r="3" />
     <circle cx="6" cy="18" r="3" />
     <path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12" />
+  </svg>
+)
+
+export const ChevronUpIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M18 15l-6-6-6 6" />
+  </svg>
+)
+
+export const ChevronDownIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M6 9l6 6 6-6" />
   </svg>
 )

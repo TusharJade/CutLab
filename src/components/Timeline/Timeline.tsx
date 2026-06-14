@@ -4,7 +4,18 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from 'react'
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import { useSelector } from 'react-redux'
 import { useAppDispatch } from '../../store/hooks'
 import {
@@ -23,20 +34,28 @@ import {
   zoomIn,
   zoomOut,
 } from '../../store/slices/editorSlice'
-import { moveClip, moveTrack, removeTrack, trimClip } from '../../store/slices/projectSlice'
-import type { Clip, MediaAsset, TrackType } from '../../types'
-import { TrashIcon, ZoomInIcon, ZoomOutIcon } from '../icons'
+import {
+  moveClip,
+  removeClip,
+  splitClipAtFrame,
+  trimClip,
+} from '../../store/slices/projectSlice'
+import { moveClipToNewTrack } from '../../store/thunks'
+import type { Clip, MediaAsset, Track, TrackType } from '../../types'
+import {
+  ScissorsIcon,
+  TrashIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from '../icons'
 import { ClipBlock } from './ClipBlock'
 import { buildTicks } from './ticks'
-import {
-  LABEL_WIDTH,
-  RULER_HEIGHT,
-  TRACK_COLOR_VAR,
-  TRACK_HEIGHT,
-} from './timelineConstants'
+import { computeTrim } from './trim'
+import { RIGHT_GUTTER_PX, RULER_HEIGHT, TRACK_HEIGHT } from './timelineConstants'
 
-interface DragState {
-  mode: 'move' | 'trim'
+const NEW_TRACK_DROP_ID = 'new-track'
+
+interface TrimState {
   edge: 'left' | 'right'
   clipId: string
   startClientX: number
@@ -47,6 +66,54 @@ interface DragState {
   speed: number
   sourceFrames: number
   type: TrackType
+  minStartFrame: number
+  maxEndFrame: number
+}
+
+function TrackLane({
+  track,
+  width,
+  onEmptyPointerDown,
+  children,
+}: {
+  track: Track
+  width: number
+  onEmptyPointerDown: (event: ReactPointerEvent) => void
+  children: ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: track.id,
+    data: { type: track.type },
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative border-b border-border transition-colors ${
+        isOver ? 'ring-1 ring-inset ring-primary' : ''
+      }`}
+      style={{ width, height: TRACK_HEIGHT, backgroundColor: 'var(--panel-2)' }}
+      onPointerDown={onEmptyPointerDown}
+    >
+      {children}
+    </div>
+  )
+}
+
+function NewTrackDropZone({ width }: { width: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: NEW_TRACK_DROP_ID })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center border-b border-dashed text-xxs uppercase tracking-wider transition-colors ${
+        isOver
+          ? 'border-primary bg-primary/10 text-fg'
+          : 'border-border text-muted-2'
+      }`}
+      style={{ width, height: TRACK_HEIGHT }}
+    >
+      Drop here to add a new track
+    </div>
+  )
 }
 
 export function Timeline() {
@@ -61,7 +128,11 @@ export function Timeline() {
   const projectDuration = useSelector(selectProjectDurationInFrames)
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [dragState, setDragState] = useState<DragState | null>(null)
+  const [trimState, setTrimState] = useState<TrimState | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  )
 
   const mediaRecord = useMemo(() => {
     return assets.reduce<Record<string, MediaAsset>>((record, asset) => {
@@ -70,18 +141,57 @@ export function Timeline() {
     }, {})
   }, [assets])
 
-  const contentFrames = projectDuration + fps * 3
-  const contentWidth = contentFrames * pixelsPerFrame
+  const contentWidth = projectDuration * pixelsPerFrame + RIGHT_GUTTER_PX
   const ticks = useMemo(
-    () => buildTicks(contentFrames, fps, pixelsPerFrame),
-    [contentFrames, fps, pixelsPerFrame],
+    () => buildTicks(projectDuration, fps, pixelsPerFrame),
+    [projectDuration, fps, pixelsPerFrame],
   )
+
+  const selectedClip = selectedClipId ? clips[selectedClipId] : undefined
+  const canSplit =
+    !!selectedClip &&
+    playheadFrame > selectedClip.startFrame &&
+    playheadFrame < selectedClip.startFrame + selectedClip.durationInFrames
+
+  function handleSplit() {
+    if (!selectedClip || !canSplit) return
+    dispatch(
+      splitClipAtFrame({ clipId: selectedClip.id, frame: playheadFrame }),
+    )
+  }
+
+  function handleDelete() {
+    if (!selectedClip) return
+    dispatch(removeClip(selectedClip.id))
+    dispatch(selectClip(null))
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    dispatch(selectClip(String(event.active.id)))
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const clipId = String(event.active.id)
+    const clip = clips[clipId]
+    if (!clip) return
+    const deltaFrames = Math.round(event.delta.x / pixelsPerFrame)
+    const startFrame = Math.max(0, clip.startFrame + deltaFrames)
+    const overId = event.over ? String(event.over.id) : undefined
+
+    if (overId === NEW_TRACK_DROP_ID) {
+      dispatch(moveClipToNewTrack({ clipId, startFrame }))
+      return
+    }
+
+    const trackId = overId && overId !== clip.trackId ? overId : undefined
+    dispatch(moveClip({ clipId, startFrame, trackId }))
+  }
 
   function frameFromClientX(clientX: number): number {
     const container = scrollRef.current
     if (!container) return 0
     const rect = container.getBoundingClientRect()
-    const x = clientX - rect.left + container.scrollLeft - LABEL_WIDTH
+    const x = clientX - rect.left + container.scrollLeft
     return Math.max(0, Math.round(x / pixelsPerFrame))
   }
 
@@ -98,27 +208,29 @@ export function Timeline() {
     window.addEventListener('pointerup', up)
   }
 
-  function beginMove(event: ReactPointerEvent, clip: Clip) {
-    const media = mediaRecord[clip.mediaId]
-    setDragState({
-      mode: 'move',
-      edge: 'left',
-      clipId: clip.id,
-      startClientX: event.clientX,
-      originStartFrame: clip.startFrame,
-      originDuration: clip.durationInFrames,
-      originTrimStart: clip.trimStartFrame,
-      originTrimEnd: clip.trimEndFrame,
-      speed: clip.speed,
-      sourceFrames: media ? Math.floor(media.naturalDurationSeconds * fps) : 0,
-      type: clip.type,
-    })
+  function neighbourBounds(clip: Clip) {
+    const track = tracks.find((item) => item.id === clip.trackId)
+    const clipEnd = clip.startFrame + clip.durationInFrames
+    let minStartFrame = 0
+    let maxEndFrame = Number.MAX_SAFE_INTEGER
+    for (const id of track?.clipIds ?? []) {
+      if (id === clip.id) continue
+      const other = clips[id]
+      if (!other) continue
+      const otherEnd = other.startFrame + other.durationInFrames
+      if (otherEnd <= clip.startFrame) {
+        minStartFrame = Math.max(minStartFrame, otherEnd)
+      } else if (other.startFrame >= clipEnd) {
+        maxEndFrame = Math.min(maxEndFrame, other.startFrame)
+      }
+    }
+    return { minStartFrame, maxEndFrame }
   }
 
   function beginTrim(event: ReactPointerEvent, clip: Clip, edge: 'left' | 'right') {
     const media = mediaRecord[clip.mediaId]
-    setDragState({
-      mode: 'trim',
+    const { minStartFrame, maxEndFrame } = neighbourBounds(clip)
+    setTrimState({
       edge,
       clipId: clip.id,
       startClientX: event.clientX,
@@ -129,83 +241,37 @@ export function Timeline() {
       speed: clip.speed,
       sourceFrames: media ? Math.floor(media.naturalDurationSeconds * fps) : 0,
       type: clip.type,
+      minStartFrame,
+      maxEndFrame,
     })
   }
 
   useEffect(() => {
-    if (!dragState) return
+    if (!trimState) return
 
     function handlePointerMove(event: PointerEvent) {
-      if (!dragState) return
+      if (!trimState) return
       const deltaFrames = Math.round(
-        (event.clientX - dragState.startClientX) / pixelsPerFrame,
+        (event.clientX - trimState.startClientX) / pixelsPerFrame,
       )
-
-      if (dragState.mode === 'move') {
-        const startFrame = Math.max(0, dragState.originStartFrame + deltaFrames)
-        dispatch(moveClip({ clipId: dragState.clipId, startFrame }))
-        return
-      }
-
-      const isImage = dragState.type === 'image'
-      const maxSourceFrames = dragState.sourceFrames || Number.MAX_SAFE_INTEGER
-
-      if (dragState.edge === 'left') {
-        const maxShift = dragState.originDuration - 1
-        const shift = Math.min(
-          maxShift,
-          Math.max(-dragState.originStartFrame, deltaFrames),
-        )
-        const startFrame = dragState.originStartFrame + shift
-        const durationInFrames = dragState.originDuration - shift
-        const trimStartFrame = isImage
-          ? 0
-          : Math.min(
-              dragState.originTrimEnd - 1,
-              Math.max(0, dragState.originTrimStart + shift * dragState.speed),
-            )
-        const trimEndFrame = isImage ? durationInFrames : dragState.originTrimEnd
-        dispatch(
-          trimClip({
-            clipId: dragState.clipId,
-            startFrame,
-            durationInFrames,
-            trimStartFrame,
-            trimEndFrame,
-          }),
-        )
-        return
-      }
-
-      // Right edge
-      const maxDurationFromSource = isImage
-        ? Number.MAX_SAFE_INTEGER
-        : Math.floor(
-            (maxSourceFrames - dragState.originTrimStart) / dragState.speed,
-          )
-      const durationInFrames = Math.max(
-        1,
-        Math.min(dragState.originDuration + deltaFrames, maxDurationFromSource),
-      )
-      const trimEndFrame = isImage
-        ? durationInFrames
-        : Math.min(
-            maxSourceFrames,
-            dragState.originTrimStart + durationInFrames * dragState.speed,
-          )
-      dispatch(
-        trimClip({
-          clipId: dragState.clipId,
-          startFrame: dragState.originStartFrame,
-          durationInFrames,
-          trimStartFrame: dragState.originTrimStart,
-          trimEndFrame,
-        }),
-      )
+      const bounds = computeTrim({
+        edge: trimState.edge,
+        deltaFrames,
+        originStartFrame: trimState.originStartFrame,
+        originDuration: trimState.originDuration,
+        originTrimStart: trimState.originTrimStart,
+        originTrimEnd: trimState.originTrimEnd,
+        speed: trimState.speed,
+        sourceFrames: trimState.sourceFrames,
+        type: trimState.type,
+        minStartFrame: trimState.minStartFrame,
+        maxEndFrame: trimState.maxEndFrame,
+      })
+      dispatch(trimClip({ clipId: trimState.clipId, ...bounds }))
     }
 
     function handlePointerUp() {
-      setDragState(null)
+      setTrimState(null)
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -214,7 +280,7 @@ export function Timeline() {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [dragState, pixelsPerFrame, dispatch])
+  }, [trimState, pixelsPerFrame, dispatch])
 
   return (
     <section className="flex h-72 shrink-0 flex-col border-t border-border bg-panel">
@@ -222,37 +288,54 @@ export function Timeline() {
         <span className="text-sm font-semibold uppercase tracking-wider text-muted">
           Timeline
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {selectedClip && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              title="Delete clip (Del)"
+              className="flex h-7 items-center gap-1.5 rounded border border-border bg-panel-2 px-2.5 text-xs font-medium text-fg transition-colors hover:border-danger hover:text-danger"
+            >
+              <TrashIcon width={13} height={13} />
+              Delete
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => dispatch(zoomOut())}
-            className="flex h-7 w-7 items-center justify-center rounded border border-border bg-panel-2 text-muted transition-colors hover:text-fg"
-            aria-label="Zoom out"
+            onClick={handleSplit}
+            disabled={!canSplit}
+            title="Split clip at playhead (S)"
+            className="flex h-7 items-center gap-1.5 rounded border border-border bg-panel-2 px-2.5 text-xs font-medium text-fg transition-colors hover:border-border-strong hover:bg-panel-3 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <ZoomOutIcon width={14} height={14} />
+            <ScissorsIcon width={13} height={13} />
+            Split
           </button>
-          <button
-            type="button"
-            onClick={() => dispatch(zoomIn())}
-            className="flex h-7 w-7 items-center justify-center rounded border border-border bg-panel-2 text-muted transition-colors hover:text-fg"
-            aria-label="Zoom in"
-          >
-            <ZoomInIcon width={14} height={14} />
-          </button>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => dispatch(zoomOut())}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-panel-2 text-muted transition-colors hover:text-fg"
+              aria-label="Zoom out"
+            >
+              <ZoomOutIcon width={14} height={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch(zoomIn())}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border bg-panel-2 text-muted transition-colors hover:text-fg"
+              aria-label="Zoom in"
+            >
+              <ZoomInIcon width={14} height={14} />
+            </button>
+          </div>
         </div>
       </div>
 
       <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto">
-        <div style={{ width: LABEL_WIDTH + contentWidth, minWidth: '100%' }}>
+        <div style={{ width: contentWidth, minWidth: '100%' }}>
           {/* Ruler */}
-          <div
-            className="sticky top-0 z-20 flex"
-            style={{ height: RULER_HEIGHT }}
-          >
-            <div
-              className="sticky left-0 z-30 shrink-0 border-b border-r border-border bg-panel"
-              style={{ width: LABEL_WIDTH, height: RULER_HEIGHT }}
-            />
+          <div className="sticky top-0 z-20" style={{ height: RULER_HEIGHT }}>
             <div
               className="relative cursor-text border-b border-border bg-panel"
               style={{ width: contentWidth, height: RULER_HEIGHT }}
@@ -280,52 +363,18 @@ export function Timeline() {
               Add media from the library to create tracks.
             </div>
           ) : (
-            tracks.map((track, index) => (
-              <div key={track.id} className="flex" style={{ height: TRACK_HEIGHT }}>
-                <div
-                  className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1 border-b border-r border-border bg-panel px-2"
-                  style={{ width: LABEL_WIDTH }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="h-2.5 w-2.5 rounded-sm"
-                      style={{ backgroundColor: TRACK_COLOR_VAR[track.type] }}
-                    />
-                    <span className="truncate text-xs font-medium">
-                      {track.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => dispatch(moveTrack({ trackId: track.id, direction: 'up' }))}
-                      disabled={index === 0}
-                      className="text-xxs text-muted-2 transition-colors hover:text-fg disabled:opacity-30"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => dispatch(moveTrack({ trackId: track.id, direction: 'down' }))}
-                      disabled={index === tracks.length - 1}
-                      className="text-xxs text-muted-2 transition-colors hover:text-fg disabled:opacity-30"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => dispatch(removeTrack(track.id))}
-                      className="ml-auto text-muted-2 transition-colors hover:text-danger"
-                      aria-label="Remove track"
-                    >
-                      <TrashIcon width={12} height={12} />
-                    </button>
-                  </div>
-                </div>
-                <div
-                  className="relative border-b border-border"
-                  style={{ width: contentWidth, backgroundColor: 'var(--panel-2)' }}
-                  onPointerDown={(event) => {
+            <DndContext
+              sensors={sensors}
+              collisionDetection={pointerWithin}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              {tracks.map((track) => (
+                <TrackLane
+                  key={track.id}
+                  track={track}
+                  width={contentWidth}
+                  onEmptyPointerDown={(event) => {
                     if (event.target === event.currentTarget) {
                       dispatch(selectClip(null))
                     }
@@ -342,21 +391,21 @@ export function Timeline() {
                         pixelsPerFrame={pixelsPerFrame}
                         isSelected={clip.id === selectedClipId}
                         onSelect={(id) => dispatch(selectClip(id))}
-                        onMoveStart={beginMove}
                         onTrimStart={beginTrim}
                       />
                     )
                   })}
-                </div>
-              </div>
-            ))
+                </TrackLane>
+              ))}
+              <NewTrackDropZone width={contentWidth} />
+            </DndContext>
           )}
 
           {/* Playhead */}
           <div
             className="pointer-events-none absolute top-0 z-30 w-px"
             style={{
-              left: LABEL_WIDTH + playheadFrame * pixelsPerFrame,
+              left: playheadFrame * pixelsPerFrame,
               height: '100%',
               backgroundColor: 'var(--playhead)',
             }}

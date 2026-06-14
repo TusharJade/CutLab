@@ -1,11 +1,21 @@
-import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from 'remotion'
-import { Audio, Video } from '@remotion/media'
+import {
+  AbsoluteFill,
+  Audio as HtmlAudio,
+  Img,
+  Video as HtmlVideo,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion'
+import { Audio as MediaAudio, Video as MediaVideo } from '@remotion/media'
 import type { Clip, MediaAsset } from '../types'
+import type { RenderMode } from './Main'
 import { resolveKeyframeProps } from './interpolateKeyframes'
+import { ReversedVideo } from './ReversedVideo'
 
 interface ClipRendererProps {
   clip: Clip
   media: MediaAsset
+  renderMode: RenderMode
 }
 
 function fadeMultiplier(
@@ -24,7 +34,7 @@ function fadeMultiplier(
   return Math.max(0, Math.min(1, value))
 }
 
-function VisualClip({ clip, media }: ClipRendererProps) {
+function VisualClip({ clip, media, renderMode }: ClipRendererProps) {
   const localFrame = useCurrentFrame()
   const { crop, padding, paddingColor } = clip.transform
 
@@ -77,7 +87,12 @@ function VisualClip({ clip, media }: ClipRendererProps) {
                 style={{ ...mediaStyle, objectFit: 'cover' }}
               />
             ) : (
-              <ForwardOrReverseVideo clip={clip} media={media} style={mediaStyle} />
+              <ForwardOrReverseVideo
+                clip={clip}
+                media={media}
+                renderMode={renderMode}
+                style={mediaStyle}
+              />
             )}
           </div>
         </div>
@@ -89,6 +104,7 @@ function VisualClip({ clip, media }: ClipRendererProps) {
 function ForwardOrReverseVideo({
   clip,
   media,
+  renderMode,
   style,
 }: ClipRendererProps & { style: React.CSSProperties }) {
   const localFrame = useCurrentFrame()
@@ -98,10 +114,32 @@ function ForwardOrReverseVideo({
     Math.floor(media.naturalDurationSeconds * fps),
   )
   const volume = clip.muted ? 0 : clip.volume
+  const isPreview = renderMode === 'preview'
+
+  // Remotion's native <Video> builds its trim window as `from = -trimBefore`
+  // but `durationInFrames = trimAfter / playbackRate`, scaling only trimAfter.
+  // To keep the window aligned when speed != 1 (e.g. after a split), pre-divide
+  // trimBefore by the speed for the native preview component. @remotion/media
+  // (export) interprets trim in source frames, so it keeps the raw value.
+  const previewTrimBefore = Math.round(clip.trimStartFrame / clip.speed)
 
   if (!clip.reverse) {
+    // Preview uses the browser-native video element so playbackRate (e.g. 2x)
+    // stays smooth; export uses @remotion/media which the web-renderer supports.
+    if (isPreview) {
+      return (
+        <HtmlVideo
+          src={media.objectUrl}
+          trimBefore={previewTrimBefore}
+          trimAfter={clip.trimEndFrame}
+          playbackRate={clip.speed}
+          volume={volume}
+          style={{ ...style, objectFit: 'cover' }}
+        />
+      )
+    }
     return (
-      <Video
+      <MediaVideo
         src={media.objectUrl}
         trimBefore={clip.trimStartFrame}
         trimAfter={clip.trimEndFrame}
@@ -113,14 +151,26 @@ function ForwardOrReverseVideo({
     )
   }
 
+  // Preview draws pre-decoded frames from the in-memory cache so reverse stays
+  // smooth (no per-frame backward seek/decode, which buffers or black-flashes).
+  if (isPreview) {
+    // Remount when the cached signature changes so frame state resets cleanly.
+    const reverseKey = `${media.id}:${media.objectUrl}:${clip.trimStartFrame}:${clip.trimEndFrame}:${clip.speed}:${clip.durationInFrames}`
+    return (
+      <ReversedVideo key={reverseKey} clip={clip} media={media} style={style} />
+    )
+  }
+
+  // Export keeps the frame-accurate path: seek the decoder per frame. This is
+  // offline so the per-frame decode cost is acceptable. playbackRate stays 1,
+  // so trimBefore matches the export interpretation.
   const reverseSourceFrame = clip.trimEndFrame - 1 - localFrame * clip.speed
   const trimBefore = Math.max(
     0,
     Math.min(sourceFrames - 1, Math.round(reverseSourceFrame - localFrame)),
   )
-
   return (
-    <Video
+    <MediaVideo
       src={media.objectUrl}
       trimBefore={trimBefore}
       volume={volume}
@@ -130,12 +180,19 @@ function ForwardOrReverseVideo({
   )
 }
 
-function AudioClip({ clip, media }: ClipRendererProps) {
+function AudioClip({ clip, media, renderMode }: ClipRendererProps) {
   const volume = clip.muted ? 0 : clip.volume
+  const isPreview = renderMode === 'preview'
+  const AudioTag = isPreview ? HtmlAudio : MediaAudio
+  // See VisualClip: the native preview component needs trimBefore pre-divided
+  // by speed so the trim window stays aligned when speed != 1.
+  const trimBefore = isPreview
+    ? Math.round(clip.trimStartFrame / clip.speed)
+    : clip.trimStartFrame
   return (
-    <Audio
+    <AudioTag
       src={media.objectUrl}
-      trimBefore={clip.trimStartFrame}
+      trimBefore={trimBefore}
       trimAfter={clip.trimEndFrame}
       playbackRate={clip.speed}
       volume={(frame) =>
@@ -151,9 +208,9 @@ function AudioClip({ clip, media }: ClipRendererProps) {
   )
 }
 
-export function ClipRenderer({ clip, media }: ClipRendererProps) {
+export function ClipRenderer({ clip, media, renderMode }: ClipRendererProps) {
   if (clip.type === 'audio') {
-    return <AudioClip clip={clip} media={media} />
+    return <AudioClip clip={clip} media={media} renderMode={renderMode} />
   }
-  return <VisualClip clip={clip} media={media} />
+  return <VisualClip clip={clip} media={media} renderMode={renderMode} />
 }

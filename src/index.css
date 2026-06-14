@@ -12,7 +12,7 @@
   --text-xl: var(--font-size-xl);
   --text-2xl: var(--font-size-2xl);
 
-  /* Colors resolve to theme.config.css tokens (swap on .light/.dark) */
+  /* Colors resolve to the dark theme tokens in theme.config.css */
   --color-canvas: var(--canvas);
   --color-panel: var(--panel);
   --color-panel-2: var(--panel-2);
@@ -70,6 +70,18 @@ body {
 }
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* CTAs show a pointer cursor (Tailwind v4 no longer sets this by default) */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+label:has(> input[type='file']),
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 /* Hide native number-input spinner buttons */

@@ -31,35 +31,60 @@ export function NumberInput({
     onChange(next)
   }
 
+  const atMin = min !== undefined && canonical <= min
+  const atMax = max !== undefined && canonical >= max
+  const stepperButton =
+    'flex h-7 w-7 shrink-0 cursor-pointer select-none items-center justify-center text-base leading-none text-muted-2 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-30'
+
   return (
     <div className="flex items-center gap-1">
-      <input
-        type="text"
-        inputMode="decimal"
-        value={draft ?? String(canonical)}
-        onFocus={(event) => event.currentTarget.select()}
-        onChange={(event) => {
-          const raw = event.target.value
-          setDraft(raw)
-          if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return
-          const parsed = Number(raw)
-          if (Number.isFinite(parsed)) {
-            onChange(clamp(parsed))
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowUp') {
-            event.preventDefault()
-            nudge(1)
-          } else if (event.key === 'ArrowDown') {
-            event.preventDefault()
-            nudge(-1)
-          }
-        }}
-        onBlur={() => setDraft(null)}
-        className="w-20 rounded border border-border bg-panel px-2 py-1 text-right text-xs text-fg outline-none focus:border-primary"
-      />
-      {suffix && <span className="text-xxs text-muted-2">{suffix}</span>}
+      <div className="flex items-center rounded border border-border bg-panel focus-within:border-primary">
+        <button
+          type="button"
+          aria-label="Decrease"
+          disabled={atMin}
+          onClick={() => nudge(-1)}
+          className={stepperButton}
+        >
+          −
+        </button>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft ?? String(canonical)}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => {
+            const raw = event.target.value
+            setDraft(raw)
+            if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return
+            const parsed = Number(raw)
+            if (Number.isFinite(parsed)) {
+              onChange(clamp(parsed))
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              nudge(1)
+            } else if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              nudge(-1)
+            }
+          }}
+          onBlur={() => setDraft(null)}
+          className="w-12 border-x border-border bg-transparent py-1 text-center text-sm text-fg outline-none"
+        />
+        <button
+          type="button"
+          aria-label="Increase"
+          disabled={atMax}
+          onClick={() => nudge(1)}
+          className={stepperButton}
+        >
+          +
+        </button>
+      </div>
+      {suffix && <span className="text-xs text-muted-2">{suffix}</span>}
     </div>
   )
 }

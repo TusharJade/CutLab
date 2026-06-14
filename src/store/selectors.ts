@@ -27,8 +27,6 @@ export const selectIsPlaying = (state: RootState) => state.editor.isPlaying
 export const selectPixelsPerFrame = (state: RootState) =>
   state.editor.pixelsPerFrame
 
-export const selectThemeMode = (state: RootState) => state.theme.mode
-
 const MIN_TIMELINE_FRAMES = 30
 
 export const selectProjectDurationInFrames = createSelector(

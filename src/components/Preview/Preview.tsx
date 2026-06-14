@@ -93,7 +93,7 @@ export function Preview() {
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
               <p className="text-sm text-muted">No clips on the timeline</p>
               <p className="mt-1 text-xs text-muted-2">
-                Add media and press + to place it
+                Upload media and click it to place it
               </p>
             </div>
           )}

@@ -88,4 +88,3 @@ export interface Project {
   tracks: Track[]
 }
 
-export type ThemeMode = 'dark' | 'light'

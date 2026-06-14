@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import { useSelector } from 'react-redux'
 import { useAppDispatch } from '../../store/hooks'
-import { selectPlayheadFrame, selectSelectedClip } from '../../store/selectors'
+import {
+  selectFps,
+  selectMediaById,
+  selectPlayheadFrame,
+  selectSelectedClip,
+} from '../../store/selectors'
 import {
   addKeyframe,
-  duplicateClip,
   removeClip,
   removeKeyframe,
   updateClip,
@@ -11,19 +16,21 @@ import {
   updateKeyframe,
 } from '../../store/slices/projectSlice'
 import { selectClip } from '../../store/slices/editorSlice'
-import type { Clip, EasingType } from '../../types'
+import type { Clip } from '../../types'
 import { createId } from '../../utils/id'
-import { CopyIcon, PlusIcon, TrashIcon } from '../icons'
+import { PlusIcon, TrashIcon } from '../icons'
 import {
   ColorInput,
   FieldRow,
   NumberInput,
   SectionTitle,
+  SegmentedControl,
   Slider,
   Toggle,
 } from '../ui'
+import { KeyframeRow } from './KeyframeRow'
 
-const EASINGS: EasingType[] = ['linear', 'easeIn', 'easeOut', 'easeInOut']
+const SPEED_PRESETS = [0.5, 1, 1.5, 2]
 
 function durationFromTrim(clip: Clip, speed: number): number {
   const trimmed = clip.trimEndFrame - clip.trimStartFrame
@@ -34,6 +41,9 @@ export function Inspector() {
   const dispatch = useAppDispatch()
   const clip = useSelector(selectSelectedClip)
   const playheadFrame = useSelector(selectPlayheadFrame)
+  const fps = useSelector(selectFps)
+  const media = useSelector(selectMediaById(clip?.mediaId ?? ''))
+  const [isCustomSpeed, setIsCustomSpeed] = useState(false)
 
   if (!clip) {
     return (
@@ -62,6 +72,44 @@ export function Inspector() {
   const handleSpeedChange = (speed: number) => {
     const safeSpeed = Math.max(0.25, Math.min(4, speed))
     setClip({ speed: safeSpeed, durationInFrames: durationFromTrim(clip, safeSpeed) })
+  }
+
+  const sourceFrames = media
+    ? Math.max(1, Math.floor(media.naturalDurationSeconds * fps))
+    : Number.MAX_SAFE_INTEGER
+
+  const handleTrimInChange = (value: number) => {
+    const trimStartFrame = Math.max(0, Math.min(value, clip.trimEndFrame - 1))
+    const durationInFrames = durationFromTrim(
+      { ...clip, trimStartFrame },
+      clip.speed,
+    )
+    // Keep the clip anchored at its timeline position; just shorten it.
+    setClip({ trimStartFrame, durationInFrames })
+  }
+
+  const handleTrimOutChange = (value: number) => {
+    const trimEndFrame = Math.max(
+      clip.trimStartFrame + 1,
+      Math.min(value, sourceFrames),
+    )
+    const durationInFrames = durationFromTrim(
+      { ...clip, trimEndFrame },
+      clip.speed,
+    )
+    setClip({ trimEndFrame, durationInFrames })
+  }
+
+  const showCustomSpeed = isCustomSpeed || !SPEED_PRESETS.includes(clip.speed)
+  const speedSegment: number | 'custom' = showCustomSpeed ? 'custom' : clip.speed
+
+  const handleSpeedSegment = (value: number | 'custom') => {
+    if (value === 'custom') {
+      setIsCustomSpeed(true)
+      return
+    }
+    setIsCustomSpeed(false)
+    handleSpeedChange(value)
   }
 
   const handleAddKeyframe = () => {
@@ -94,14 +142,6 @@ export function Inspector() {
           {clip.type}
         </span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            title="Duplicate"
-            onClick={() => dispatch(duplicateClip(clip.id))}
-            className="flex h-7 w-7 items-center justify-center rounded border border-border bg-panel-2 text-muted transition-colors hover:text-fg"
-          >
-            <CopyIcon width={13} height={13} />
-          </button>
           <button
             type="button"
             title="Delete"
@@ -139,37 +179,46 @@ export function Inspector() {
               <NumberInput
                 value={clip.trimStartFrame}
                 min={0}
-                onChange={(value) =>
-                  setClip({
-                    trimStartFrame: Math.max(
-                      0,
-                      Math.min(value, clip.trimEndFrame - 1),
-                    ),
-                  })
-                }
+                onChange={handleTrimInChange}
               />
             </FieldRow>
             <FieldRow label="Trim out">
               <NumberInput
                 value={clip.trimEndFrame}
                 min={1}
-                onChange={(value) =>
-                  setClip({
-                    trimEndFrame: Math.max(clip.trimStartFrame + 1, value),
-                  })
-                }
+                onChange={handleTrimOutChange}
               />
             </FieldRow>
-            <FieldRow label="Speed">
-              <NumberInput
-                value={clip.speed}
-                step={0.25}
-                min={0.25}
-                max={4}
-                suffix="x"
-                onChange={handleSpeedChange}
-              />
-            </FieldRow>
+            <div className="pb-1">
+              <div className="flex min-h-9 items-center">
+                <span className="text-sm text-muted">Speed</span>
+              </div>
+              <div>
+                <SegmentedControl<number | 'custom'>
+                  value={speedSegment}
+                  options={[
+                    { label: '0.5x', value: 0.5 },
+                    { label: '1x', value: 1 },
+                    { label: '1.5x', value: 1.5 },
+                    { label: '2x', value: 2 },
+                    { label: 'Custom', value: 'custom' },
+                  ]}
+                  onChange={handleSpeedSegment}
+                />
+              </div>
+              {showCustomSpeed && (
+                <div className="mt-2 flex justify-end">
+                  <NumberInput
+                    value={clip.speed}
+                    step={0.25}
+                    min={0.25}
+                    max={4}
+                    suffix="x"
+                    onChange={handleSpeedChange}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
         {clip.type === 'video' && (
@@ -184,7 +233,7 @@ export function Inspector() {
         {/* Audio */}
         {hasAudioTrack && (
           <>
-            <SectionTitle>Audio</SectionTitle>
+            <SectionTitle divider>Audio</SectionTitle>
             <FieldRow label="Mute">
               <Toggle
                 checked={clip.muted}
@@ -219,7 +268,7 @@ export function Inspector() {
         {/* Transform */}
         {isVisual && (
           <>
-            <SectionTitle>Transform</SectionTitle>
+            <SectionTitle divider>Transform</SectionTitle>
             <FieldRow label="Scale">
               <NumberInput
                 value={clip.transform.scale}
@@ -259,7 +308,7 @@ export function Inspector() {
               />
             </FieldRow>
 
-            <SectionTitle>Crop (0–1)</SectionTitle>
+            <SectionTitle divider>Crop (0–1)</SectionTitle>
             <FieldRow label="Crop X">
               <NumberInput
                 value={clip.transform.crop.x}
@@ -332,135 +381,28 @@ export function Inspector() {
             ) : (
               <ul className="flex flex-col gap-2">
                 {clip.keyframes.map((keyframe) => (
-                  <li
+                  <KeyframeRow
                     key={keyframe.id}
-                    className="rounded-lg border border-border bg-panel-2 p-2"
-                  >
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-xxs font-medium text-fg">
-                        Frame {keyframe.frame}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          dispatch(
-                            removeKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                            }),
-                          )
-                        }
-                        className="text-muted-2 transition-colors hover:text-danger"
-                      >
-                        <TrashIcon width={11} height={11} />
-                      </button>
-                    </div>
-                    <FieldRow label="Frame">
-                      <NumberInput
-                        value={keyframe.frame}
-                        min={0}
-                        max={clip.durationInFrames}
-                        onChange={(value) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: { frame: Math.max(0, value) },
-                            }),
-                          )
-                        }
-                      />
-                    </FieldRow>
-                    <FieldRow label="Scale">
-                      <NumberInput
-                        value={keyframe.props.scale}
-                        step={0.05}
-                        min={0.1}
-                        onChange={(value) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: { props: { ...keyframe.props, scale: value } },
-                            }),
-                          )
-                        }
-                      />
-                    </FieldRow>
-                    <FieldRow label="Pan X">
-                      <NumberInput
-                        value={keyframe.props.translateX}
-                        step={5}
-                        onChange={(value) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: {
-                                props: { ...keyframe.props, translateX: value },
-                              },
-                            }),
-                          )
-                        }
-                      />
-                    </FieldRow>
-                    <FieldRow label="Pan Y">
-                      <NumberInput
-                        value={keyframe.props.translateY}
-                        step={5}
-                        onChange={(value) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: {
-                                props: { ...keyframe.props, translateY: value },
-                              },
-                            }),
-                          )
-                        }
-                      />
-                    </FieldRow>
-                    <FieldRow label="Opacity">
-                      <Slider
-                        value={keyframe.props.opacity}
-                        min={0}
-                        max={1}
-                        onChange={(value) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: {
-                                props: { ...keyframe.props, opacity: value },
-                              },
-                            }),
-                          )
-                        }
-                      />
-                    </FieldRow>
-                    <FieldRow label="Easing">
-                      <select
-                        value={keyframe.easing}
-                        onChange={(event) =>
-                          dispatch(
-                            updateKeyframe({
-                              clipId: clip.id,
-                              keyframeId: keyframe.id,
-                              changes: { easing: event.target.value as EasingType },
-                            }),
-                          )
-                        }
-                        className="rounded border border-border bg-panel px-2 py-1 text-xs text-fg outline-none focus:border-primary"
-                      >
-                        {EASINGS.map((easing) => (
-                          <option key={easing} value={easing}>
-                            {easing}
-                          </option>
-                        ))}
-                      </select>
-                    </FieldRow>
-                  </li>
+                    keyframe={keyframe}
+                    maxFrame={clip.durationInFrames}
+                    onChange={(changes) =>
+                      dispatch(
+                        updateKeyframe({
+                          clipId: clip.id,
+                          keyframeId: keyframe.id,
+                          changes,
+                        }),
+                      )
+                    }
+                    onRemove={() =>
+                      dispatch(
+                        removeKeyframe({
+                          clipId: clip.id,
+                          keyframeId: keyframe.id,
+                        }),
+                      )
+                    }
+                  />
                 ))}
               </ul>
             )}

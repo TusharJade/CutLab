@@ -1,8 +1,12 @@
 import { useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { useAppDispatch } from '../store/hooks'
-import { selectSelectedClipId } from '../store/selectors'
-import { removeClip } from '../store/slices/projectSlice'
+import {
+  selectPlayheadFrame,
+  selectSelectedClip,
+  selectSelectedClipId,
+} from '../store/selectors'
+import { removeClip, splitClipAtFrame } from '../store/slices/projectSlice'
 import { selectClip, setIsPlaying } from '../store/slices/editorSlice'
 import type { RootState } from '../store'
 
@@ -20,6 +24,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function useKeyboardShortcuts() {
   const dispatch = useAppDispatch()
   const selectedClipId = useSelector(selectSelectedClipId)
+  const selectedClip = useSelector(selectSelectedClip)
+  const playheadFrame = useSelector(selectPlayheadFrame)
   const isPlaying = useSelector((state: RootState) => state.editor.isPlaying)
 
   useEffect(() => {
@@ -29,6 +35,20 @@ export function useKeyboardShortcuts() {
       if (event.code === 'Space') {
         event.preventDefault()
         dispatch(setIsPlaying(!isPlaying))
+        return
+      }
+
+      if (event.key === 's' || event.key === 'S') {
+        if (
+          selectedClip &&
+          playheadFrame > selectedClip.startFrame &&
+          playheadFrame < selectedClip.startFrame + selectedClip.durationInFrames
+        ) {
+          event.preventDefault()
+          dispatch(
+            splitClipAtFrame({ clipId: selectedClip.id, frame: playheadFrame }),
+          )
+        }
         return
       }
 
@@ -44,5 +64,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dispatch, isPlaying, selectedClipId])
+  }, [dispatch, isPlaying, selectedClipId, selectedClip, playheadFrame])
 }

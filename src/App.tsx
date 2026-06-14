@@ -1,22 +1,11 @@
-import { useEffect } from 'react'
-import { useSelector } from 'react-redux'
 import { Header } from './components/Header/Header'
 import { MediaLibrary } from './components/MediaLibrary/MediaLibrary'
 import { Preview } from './components/Preview/Preview'
 import { Inspector } from './components/Inspector/Inspector'
 import { Timeline } from './components/Timeline/Timeline'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import { selectThemeMode } from './store/selectors'
 
 function App() {
-  const themeMode = useSelector(selectThemeMode)
-
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('light', 'dark')
-    root.classList.add(themeMode)
-  }, [themeMode])
-
   useKeyboardShortcuts()
 
   return (

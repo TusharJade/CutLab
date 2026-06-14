@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, current, type PayloadAction } from '@reduxjs/toolkit'
 import type { Clip, ClipTransform, Keyframe, Track, TrackType } from '../../types'
 import { DEFAULT_FPS, DEFAULT_HEIGHT, DEFAULT_WIDTH } from '../../utils/factory'
 import { createId } from '../../utils/id'
@@ -29,6 +29,56 @@ const initialState: ProjectState = {
 function nextTrackName(state: ProjectState, type: TrackType): string {
   const count = state.tracks.filter((track) => track.type === type).length
   return `${TRACK_LABEL[type]} ${count + 1}`
+}
+
+/**
+ * Finds the closest start frame on a track where a clip of the given duration
+ * fits without overlapping its neighbours. Clips on the same track may touch
+ * but never overlap; layering is done by using separate tracks instead.
+ */
+function resolveNonOverlappingStart(
+  clips: Record<string, Clip>,
+  track: Track,
+  movingClipId: string,
+  desiredStart: number,
+  duration: number,
+): number {
+  const occupied = track.clipIds
+    .filter((id) => id !== movingClipId)
+    .map((id) => clips[id])
+    .filter((clip): clip is Clip => Boolean(clip))
+    .map((clip) => ({
+      start: clip.startFrame,
+      end: clip.startFrame + clip.durationInFrames,
+    }))
+    .sort((a, b) => a.start - b.start)
+
+  const desiredEnd = desiredStart + duration
+  const overlaps = occupied.some(
+    (slot) => desiredStart < slot.end && desiredEnd > slot.start,
+  )
+  if (!overlaps) return desiredStart
+
+  let best = desiredStart
+  let bestDistance = Number.POSITIVE_INFINITY
+  const considerGap = (gapStart: number, gapEnd: number) => {
+    if (gapEnd - gapStart < duration) return
+    const candidate = Math.min(Math.max(desiredStart, gapStart), gapEnd - duration)
+    const distance = Math.abs(candidate - desiredStart)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = candidate
+    }
+  }
+
+  let cursor = 0
+  for (const slot of occupied) {
+    considerGap(cursor, slot.start)
+    cursor = Math.max(cursor, slot.end)
+  }
+  considerGap(cursor, Number.MAX_SAFE_INTEGER)
+
+  return Math.max(0, best)
 }
 
 const projectSlice = createSlice({
@@ -91,6 +141,9 @@ const projectSlice = createSlice({
       const track = state.tracks.find((item) => item.id === clip.trackId)
       if (track) {
         track.clipIds = track.clipIds.filter((id) => id !== clip.id)
+        if (track.clipIds.length === 0) {
+          state.tracks = state.tracks.filter((item) => item.id !== track.id)
+        }
       }
       delete state.clips[action.payload]
     },
@@ -101,7 +154,7 @@ const projectSlice = createSlice({
         const track = state.tracks.find((item) => item.id === source.trackId)
         if (!track) return
         const copy: Clip = {
-          ...structuredClone(source),
+          ...structuredClone(current(source)),
           id: action.payload.newId,
           startFrame: source.startFrame + source.durationInFrames,
         }
@@ -111,6 +164,50 @@ const projectSlice = createSlice({
       prepare(clipId: string) {
         return { payload: { clipId, newId: createId('clip') } }
       },
+    },
+    splitClipAtFrame(
+      state,
+      action: PayloadAction<{ clipId: string; frame: number }>,
+    ) {
+      const clip = state.clips[action.payload.clipId]
+      if (!clip) return
+      const localOffset = Math.round(action.payload.frame - clip.startFrame)
+      if (localOffset <= 0 || localOffset >= clip.durationInFrames) return
+
+      const track = state.tracks.find((item) => item.id === clip.trackId)
+      if (!track) return
+
+      const sourceSplit =
+        clip.type === 'image'
+          ? clip.trimStartFrame + localOffset
+          : Math.round(clip.trimStartFrame + localOffset * clip.speed)
+
+      const snapshot = structuredClone(current(clip))
+      const rightClip: Clip = {
+        ...snapshot,
+        id: createId('clip'),
+        startFrame: clip.startFrame + localOffset,
+        durationInFrames: clip.durationInFrames - localOffset,
+        trimStartFrame: sourceSplit,
+        trimEndFrame: clip.trimEndFrame,
+        keyframes: snapshot.keyframes
+          .filter((keyframe) => keyframe.frame > localOffset)
+          .map((keyframe) => ({
+            ...keyframe,
+            id: createId('keyframe'),
+            frame: keyframe.frame - localOffset,
+          })),
+      }
+
+      clip.durationInFrames = localOffset
+      clip.trimEndFrame = sourceSplit
+      clip.keyframes = clip.keyframes.filter(
+        (keyframe) => keyframe.frame <= localOffset,
+      )
+
+      state.clips[rightClip.id] = rightClip
+      const index = track.clipIds.indexOf(clip.id)
+      track.clipIds.splice(index + 1, 0, rightClip.id)
     },
     moveClip(
       state,
@@ -123,14 +220,37 @@ const projectSlice = createSlice({
       const { clipId, startFrame, trackId } = action.payload
       const clip = state.clips[clipId]
       if (!clip) return
-      clip.startFrame = Math.max(0, Math.round(startFrame))
-      if (trackId && trackId !== clip.trackId) {
-        const fromTrack = state.tracks.find((item) => item.id === clip.trackId)
+
+      const fromTrackId = clip.trackId
+      let destTrack = state.tracks.find((item) => item.id === fromTrackId)
+      if (trackId && trackId !== fromTrackId) {
         const toTrack = state.tracks.find((item) => item.id === trackId)
-        if (fromTrack && toTrack && toTrack.type === clip.type) {
-          fromTrack.clipIds = fromTrack.clipIds.filter((id) => id !== clipId)
+        if (toTrack && toTrack.type === clip.type) {
+          if (destTrack) {
+            destTrack.clipIds = destTrack.clipIds.filter((id) => id !== clipId)
+          }
           toTrack.clipIds.push(clipId)
           clip.trackId = trackId
+          destTrack = toTrack
+        }
+      }
+
+      const desiredStart = Math.max(0, Math.round(startFrame))
+      clip.startFrame = destTrack
+        ? resolveNonOverlappingStart(
+            state.clips,
+            destTrack,
+            clipId,
+            desiredStart,
+            clip.durationInFrames,
+          )
+        : desiredStart
+
+      // Drop the source track if the clip moved away and left it empty.
+      if (clip.trackId !== fromTrackId) {
+        const source = state.tracks.find((item) => item.id === fromTrackId)
+        if (source && source.clipIds.length === 0) {
+          state.tracks = state.tracks.filter((item) => item.id !== fromTrackId)
         }
       }
     },
@@ -220,6 +340,7 @@ export const {
   addClip,
   removeClip,
   duplicateClip,
+  splitClipAtFrame,
   moveClip,
   trimClip,
   updateClip,
