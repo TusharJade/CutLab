@@ -1,14 +1,15 @@
 import { useEffect } from 'react'
-import { useSelector } from 'react-redux'
-import { useAppDispatch } from '../store/hooks'
-import {
-  selectPlayheadFrame,
-  selectSelectedClip,
-  selectSelectedClipId,
-} from '../store/selectors'
+import { useDispatch, useSelector } from 'react-redux'
 import { removeClip, splitClipAtFrame } from '../store/slices/projectSlice'
 import { selectClip, setIsPlaying } from '../store/slices/editorSlice'
-import type { RootState } from '../store'
+import type { AppDispatch, RootState } from '../store/store'
+
+const selectSelectedClipId = (state: RootState) => state.editor.selectedClipId
+const selectSelectedClip = (state: RootState) =>
+  state.editor.selectedClipId
+    ? state.project.clips[state.editor.selectedClipId]
+    : undefined
+const selectPlayheadFrame = (state: RootState) => state.editor.playheadFrame
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -22,7 +23,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function useKeyboardShortcuts() {
-  const dispatch = useAppDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const selectedClipId = useSelector(selectSelectedClipId)
   const selectedClip = useSelector(selectSelectedClip)
   const playheadFrame = useSelector(selectPlayheadFrame)

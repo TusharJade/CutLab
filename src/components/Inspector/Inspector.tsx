@@ -1,12 +1,6 @@
 import { useState } from 'react'
-import { useSelector } from 'react-redux'
-import { useAppDispatch } from '../../store/hooks'
-import {
-  selectFps,
-  selectMediaById,
-  selectPlayheadFrame,
-  selectSelectedClip,
-} from '../../store/selectors'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch, RootState } from '../../store/store'
 import {
   addKeyframe,
   removeClip,
@@ -16,8 +10,18 @@ import {
   updateKeyframe,
 } from '../../store/slices/projectSlice'
 import { selectClip } from '../../store/slices/editorSlice'
-import type { Clip } from '../../types'
+import type { Clip } from '../../utils/types'
+import { SPEED_PRESETS } from '../../utils/constants'
 import { createId } from '../../utils/id'
+
+const selectFps = (state: RootState) => state.project.fps
+const selectPlayheadFrame = (state: RootState) => state.editor.playheadFrame
+const selectSelectedClip = (state: RootState) =>
+  state.editor.selectedClipId
+    ? state.project.clips[state.editor.selectedClipId]
+    : undefined
+const selectMediaById = (mediaId: string) => (state: RootState) =>
+  state.media.assets.find((asset) => asset.id === mediaId)
 import { PlusIcon, TrashIcon } from '../icons'
 import {
   ColorInput,
@@ -27,10 +31,8 @@ import {
   SegmentedControl,
   Slider,
   Toggle,
-} from '../ui'
+} from '../UI'
 import { KeyframeRow } from './KeyframeRow'
-
-const SPEED_PRESETS = [0.5, 1, 1.5, 2]
 
 function durationFromTrim(clip: Clip, speed: number): number {
   const trimmed = clip.trimEndFrame - clip.trimStartFrame
@@ -38,7 +40,7 @@ function durationFromTrim(clip: Clip, speed: number): number {
 }
 
 export function Inspector() {
-  const dispatch = useAppDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const clip = useSelector(selectSelectedClip)
   const playheadFrame = useSelector(selectPlayheadFrame)
   const fps = useSelector(selectFps)

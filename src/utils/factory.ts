@@ -1,10 +1,6 @@
-import type { Clip, ClipTransform, MediaAsset, TrackType } from '../types'
+import type { Clip, ClipTransform, CreateClipArgs, MediaAsset, TrackType } from './types'
+import { DEFAULT_IMAGE_DURATION_SECONDS } from './constants'
 import { createId } from './id'
-
-export const DEFAULT_FPS = 30
-export const DEFAULT_WIDTH = 1080
-export const DEFAULT_HEIGHT = 1920
-export const DEFAULT_IMAGE_DURATION_SECONDS = 5
 
 export function createDefaultTransform(): ClipTransform {
   return {
@@ -21,18 +17,12 @@ export function mediaTypeToTrackType(type: MediaAsset['type']): TrackType {
   return type
 }
 
-interface CreateClipArgs {
-  media: MediaAsset
-  trackId: string
-  startFrame: number
-  fps: number
-}
-
 export function createClipFromMedia({
   media,
   trackId,
   startFrame,
   fps,
+  id,
 }: CreateClipArgs): Clip {
   const sourceDuration =
     media.type === 'image'
@@ -41,7 +31,7 @@ export function createClipFromMedia({
   const durationInFrames = Math.max(1, Math.round(sourceDuration * fps))
 
   return {
-    id: createId('clip'),
+    id: id ?? createId('clip'),
     mediaId: media.id,
     type: mediaTypeToTrackType(media.type),
     trackId,

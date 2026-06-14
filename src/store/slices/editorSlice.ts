@@ -1,13 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-
-interface EditorState {
-  selectedClipId: string | null
-  /* Playhead position in frames */
-  playheadFrame: number
-  isPlaying: boolean
-  /* Timeline horizontal zoom, in pixels per frame */
-  pixelsPerFrame: number
-}
+import type { EditorState } from '../../utils/types'
+import { MAX_ZOOM, MIN_ZOOM } from '../../utils/constants'
 
 const initialState: EditorState = {
   selectedClipId: null,
@@ -15,9 +8,6 @@ const initialState: EditorState = {
   isPlaying: false,
   pixelsPerFrame: 4,
 }
-
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 30
 
 const editorSlice = createSlice({
   name: 'editor',

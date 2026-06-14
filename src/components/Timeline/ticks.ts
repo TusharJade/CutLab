@@ -1,10 +1,8 @@
-const TICK_SECONDS_CANDIDATES = [1, 2, 5, 10, 15, 30, 60, 120, 300]
-const MIN_TICK_SPACING_PX = 64
-
-export interface Tick {
-  frame: number
-  label: string
-}
+import type { Tick } from '../../utils/types'
+import {
+  MIN_TICK_SPACING_PX,
+  TICK_SECONDS_CANDIDATES,
+} from '../../utils/constants'
 
 export function buildTicks(
   totalFrames: number,

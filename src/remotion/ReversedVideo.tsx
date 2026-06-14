@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import type { Clip, MediaAsset } from "../types";
+import type { ReversedVideoProps } from "../utils/types";
 import { getReversedFrames } from "./reverseFrameCache";
-
-interface ReversedVideoProps {
-  clip: Clip;
-  media: MediaAsset;
-  style: React.CSSProperties;
-}
 
 const overlayStyle: React.CSSProperties = {
   position: "absolute",

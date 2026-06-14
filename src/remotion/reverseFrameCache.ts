@@ -5,28 +5,8 @@
  * right cached frame each tick - zero per-frame decode, no buffering.
  */
 
-interface ReverseFramesParams {
-  mediaId: string
-  mediaUrl: string
-  trimStartFrame: number
-  trimEndFrame: number
-  speed: number
-  durationInFrames: number
-  sourceFrames: number
-  fps: number
-  sourceWidth: number
-  sourceHeight: number
-}
-
-interface CacheEntry {
-  /* One bitmap per clip-local frame (may reference shared bitmaps). */
-  framesByLocalFrame: ImageBitmap[]
-  /* Distinct bitmaps, used only for cleanup. */
-  uniqueBitmaps: ImageBitmap[]
-}
-
-const MAX_DIMENSION = 1280
-const MAX_CACHE_ENTRIES = 3
+import type { CacheEntry, ReverseFramesParams } from '../utils/types'
+import { MAX_CACHE_ENTRIES, MAX_DIMENSION } from '../utils/constants'
 
 const cache = new Map<string, Promise<CacheEntry>>()
 

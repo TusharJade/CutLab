@@ -1,4 +1,4 @@
-import type { MediaAsset, MediaType } from '../types'
+import type { MediaAsset, MediaType } from './types'
 import { createId } from './id'
 
 export function detectMediaType(file: File): MediaType | null {

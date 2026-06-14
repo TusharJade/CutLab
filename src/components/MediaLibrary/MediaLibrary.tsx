@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { useSelector } from 'react-redux'
-import { useAppDispatch } from '../../store/hooks'
-import { selectMediaAssets } from '../../store/selectors'
+import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch, RootState } from '../../store/store'
 import { addMediaAsset, removeMediaAsset } from '../../store/slices/mediaSlice'
-import { addMediaToTimeline } from '../../store/thunks'
-import type { MediaAsset } from '../../types'
+import {
+  addMediaToTimeline,
+  removeClipsByMedia,
+} from '../../store/slices/projectSlice'
+import { selectClip } from '../../store/slices/editorSlice'
+import type { MediaAsset } from '../../utils/types'
 import { createMediaAsset } from '../../utils/media'
 import { formatSeconds } from '../../utils/format'
 import {
@@ -14,6 +17,10 @@ import {
   TrashIcon,
   VideoIcon,
 } from '../icons'
+
+const selectClips = (state: RootState) => state.project.clips
+const selectMediaAssets = (state: RootState) => state.media.assets
+const selectSelectedClipId = (state: RootState) => state.editor.selectedClipId
 
 const TYPE_ICON = {
   video: VideoIcon,
@@ -89,10 +96,29 @@ function MediaCard({
 }
 
 export function MediaLibrary() {
-  const dispatch = useAppDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const assets = useSelector(selectMediaAssets)
+  const clips = useSelector(selectClips)
+  const selectedClipId = useSelector(selectSelectedClipId)
   const [isDragging, setIsDragging] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<MediaAsset | null>(null)
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return
+    const selectedClip = selectedClipId ? clips[selectedClipId] : undefined
+    if (selectedClip && selectedClip.mediaId === pendingDelete.id) {
+      dispatch(selectClip(null))
+    }
+    dispatch(removeClipsByMedia(pendingDelete.id))
+    dispatch(removeMediaAsset(pendingDelete.id))
+    setPendingDelete(null)
+  }
+
+  const addToTimeline = (asset: MediaAsset) => {
+    const action = dispatch(addMediaToTimeline(asset))
+    dispatch(selectClip(action.payload.clipId))
+  }
 
   async function importFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -101,7 +127,7 @@ export function MediaLibrary() {
       const asset = await createMediaAsset(file)
       if (asset) {
         dispatch(addMediaAsset(asset))
-        dispatch(addMediaToTimeline(asset))
+        addToTimeline(asset)
       }
     }
     setIsImporting(false)
@@ -162,13 +188,60 @@ export function MediaLibrary() {
               <MediaCard
                 key={asset.id}
                 asset={asset}
-                onAdd={() => dispatch(addMediaToTimeline(asset))}
-                onRemove={() => dispatch(removeMediaAsset(asset.id))}
+                onAdd={() => addToTimeline(asset)}
+                onRemove={() => setPendingDelete(asset)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {pendingDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPendingDelete(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+            className="w-104 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-panel p-5 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/15 text-danger">
+                <TrashIcon />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-fg">Delete file</h2>
+                <p className="mt-1.5 text-base leading-relaxed text-muted">
+                  Any associated timeline clips will also be removed. Are you
+                  sure you want to delete{' '}
+                  <span className="font-semibold text-fg">
+                    {pendingDelete.name}
+                  </span>
+                  ?
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                className="h-9 rounded-md border border-border bg-panel-2 px-4 text-base text-fg transition-colors hover:bg-panel-3"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="h-9 rounded-md bg-danger px-4 text-base font-medium text-white transition-colors hover:opacity-90"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

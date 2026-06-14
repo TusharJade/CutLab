@@ -1,26 +1,4 @@
-import type { TrackType } from '../../types'
-
-export interface TrimInput {
-  edge: 'left' | 'right'
-  deltaFrames: number
-  originStartFrame: number
-  originDuration: number
-  originTrimStart: number
-  originTrimEnd: number
-  speed: number
-  sourceFrames: number
-  type: TrackType
-  /* Earliest start / latest end allowed by neighbouring clips on the track. */
-  minStartFrame: number
-  maxEndFrame: number
-}
-
-export interface TrimResult {
-  startFrame: number
-  durationInFrames: number
-  trimStartFrame: number
-  trimEndFrame: number
-}
+import type { TrimInput, TrimResult } from '../../utils/types'
 
 /**
  * Computes the new clip bounds while dragging a trim handle. Images have no

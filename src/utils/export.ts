@@ -1,15 +1,6 @@
 import { renderMediaOnWeb } from '@remotion/web-renderer'
-import { Main, type MainProps } from '../remotion/Main'
-
-interface ExportArgs {
-  inputProps: MainProps
-  width: number
-  height: number
-  fps: number
-  durationInFrames: number
-  onProgress?: (ratio: number) => void
-  signal?: AbortSignal
-}
+import { TimelineComposition } from '../remotion/TimelineComposition'
+import type { ExportArgs, TimelineCompositionProps } from './types'
 
 export async function exportProjectToMp4({
   inputProps,
@@ -20,10 +11,13 @@ export async function exportProjectToMp4({
   onProgress,
   signal,
 }: ExportArgs): Promise<void> {
-  const exportProps: MainProps = { ...inputProps, renderMode: 'export' }
+  const exportProps: TimelineCompositionProps = {
+    ...inputProps,
+    renderMode: 'export',
+  }
   const result = await renderMediaOnWeb({
     composition: {
-      component: Main,
+      component: TimelineComposition,
       id: 'cutlab',
       width,
       height,

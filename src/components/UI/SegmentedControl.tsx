@@ -1,7 +1,4 @@
-interface SegmentOption<T extends string | number> {
-  label: string
-  value: T
-}
+import type { SegmentOption } from '../../utils/types'
 
 export function SegmentedControl<T extends string | number>({
   value,

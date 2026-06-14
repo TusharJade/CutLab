@@ -1,6 +1,4 @@
-import type { SVGProps } from 'react'
-
-type IconProps = SVGProps<SVGSVGElement>
+import type { IconProps } from '../utils/types'
 
 const base = (props: IconProps) => ({
   width: 16,

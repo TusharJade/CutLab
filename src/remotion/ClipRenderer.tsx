@@ -7,16 +7,9 @@ import {
   useVideoConfig,
 } from 'remotion'
 import { Audio as MediaAudio, Video as MediaVideo } from '@remotion/media'
-import type { Clip, MediaAsset } from '../types'
-import type { RenderMode } from './Main'
+import type { ClipRendererProps } from '../utils/types'
 import { resolveKeyframeProps } from './interpolateKeyframes'
 import { ReversedVideo } from './ReversedVideo'
-
-interface ClipRendererProps {
-  clip: Clip
-  media: MediaAsset
-  renderMode: RenderMode
-}
 
 function fadeMultiplier(
   localFrame: number,

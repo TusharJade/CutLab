@@ -1,24 +1,14 @@
 import { AbsoluteFill, Sequence } from 'remotion'
-import type { Clip, MediaAsset, Track } from '../types'
+import type { TimelineCompositionProps } from '../utils/types'
 import { ClipRenderer } from './ClipRenderer'
 
-export type RenderMode = 'preview' | 'export'
-
-export type MainProps = {
-  tracks: Track[]
-  clips: Record<string, Clip>
-  media: Record<string, MediaAsset>
-  backgroundColor: string
-  renderMode?: RenderMode
-}
-
-export function Main({
+export function TimelineComposition({
   tracks,
   clips,
   media,
   backgroundColor,
   renderMode = 'preview',
-}: MainProps) {
+}: TimelineCompositionProps) {
   // Render last track first so the topmost timeline track paints on top.
   const orderedTracks = [...tracks].reverse()
 

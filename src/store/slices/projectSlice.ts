@@ -1,15 +1,16 @@
 import { createSlice, current, type PayloadAction } from '@reduxjs/toolkit'
-import type { Clip, ClipTransform, Keyframe, Track, TrackType } from '../../types'
-import { DEFAULT_FPS, DEFAULT_HEIGHT, DEFAULT_WIDTH } from '../../utils/factory'
+import type {
+  Clip,
+  ClipTransform,
+  Keyframe,
+  MediaAsset,
+  ProjectState,
+  Track,
+  TrackType,
+} from '../../utils/types'
+import { DEFAULT_FPS, DEFAULT_HEIGHT, DEFAULT_WIDTH } from '../../utils/constants'
+import { createClipFromMedia, mediaTypeToTrackType } from '../../utils/factory'
 import { createId } from '../../utils/id'
-
-interface ProjectState {
-  fps: number
-  width: number
-  height: number
-  tracks: Track[]
-  clips: Record<string, Clip>
-}
 
 const TRACK_LABEL: Record<TrackType, string> = {
   video: 'Video',
@@ -147,6 +148,22 @@ const projectSlice = createSlice({
       }
       delete state.clips[action.payload]
     },
+    removeClipsByMedia(state, action: PayloadAction<string>) {
+      const mediaId = action.payload
+      const removedClipIds = new Set(
+        Object.values(state.clips)
+          .filter((clip) => clip.mediaId === mediaId)
+          .map((clip) => clip.id),
+      )
+      if (removedClipIds.size === 0) return
+      removedClipIds.forEach((clipId) => delete state.clips[clipId])
+      state.tracks = state.tracks
+        .map((track) => ({
+          ...track,
+          clipIds: track.clipIds.filter((id) => !removedClipIds.has(id)),
+        }))
+        .filter((track) => track.clipIds.length > 0)
+    },
     duplicateClip: {
       reducer(state, action: PayloadAction<{ clipId: string; newId: string }>) {
         const source = state.clips[action.payload.clipId]
@@ -254,6 +271,92 @@ const projectSlice = createSlice({
         }
       }
     },
+    // Places a media asset on the timeline as a new stacked layer: each call
+    // creates a fresh track (Video 1, Video 2, …) and drops the clip at frame 0.
+    // The first non-audio import also matches the composition to the media.
+    addMediaToTimeline: {
+      reducer(
+        state,
+        action: PayloadAction<{
+          media: MediaAsset
+          trackId: string
+          clipId: string
+        }>,
+      ) {
+        const { media, trackId, clipId } = action.payload
+        const trackType = mediaTypeToTrackType(media.type)
+
+        const isFirstClip = Object.keys(state.clips).length === 0
+        if (isFirstClip && media.type !== 'audio') {
+          state.width = Math.round(media.width)
+          state.height = Math.round(media.height)
+        }
+
+        state.tracks.push({
+          id: trackId,
+          name: nextTrackName(state, trackType),
+          type: trackType,
+          clipIds: [clipId],
+        })
+        state.clips[clipId] = createClipFromMedia({
+          media,
+          trackId,
+          startFrame: 0,
+          fps: state.fps,
+          id: clipId,
+        })
+      },
+      prepare(media: MediaAsset) {
+        return {
+          payload: { media, trackId: createId('track'), clipId: createId('clip') },
+        }
+      },
+    },
+    // Moves a clip onto a brand new track of its own type, created at the bottom
+    // of the timeline. The source track is cleaned up if it ends up empty.
+    moveClipToNewTrack: {
+      reducer(
+        state,
+        action: PayloadAction<{
+          clipId: string
+          startFrame: number
+          trackId: string
+        }>,
+      ) {
+        const { clipId, startFrame, trackId } = action.payload
+        const clip = state.clips[clipId]
+        if (!clip) return
+
+        const fromTrackId = clip.trackId
+        const newTrack: Track = {
+          id: trackId,
+          name: nextTrackName(state, clip.type),
+          type: clip.type,
+          clipIds: [clipId],
+        }
+        state.tracks.push(newTrack)
+
+        const source = state.tracks.find((item) => item.id === fromTrackId)
+        if (source) {
+          source.clipIds = source.clipIds.filter((id) => id !== clipId)
+        }
+        clip.trackId = trackId
+        clip.startFrame = resolveNonOverlappingStart(
+          state.clips,
+          newTrack,
+          clipId,
+          Math.max(0, Math.round(startFrame)),
+          clip.durationInFrames,
+        )
+
+        if (source && source.clipIds.length === 0) {
+          state.tracks = state.tracks.filter((item) => item.id !== fromTrackId)
+        }
+      },
+      prepare({ clipId, startFrame }: { clipId: string; startFrame: number }) {
+        return { payload: { clipId, startFrame, trackId: createId('track') } }
+      },
+    },
     trimClip(
       state,
       action: PayloadAction<{
@@ -339,9 +442,12 @@ export const {
   moveTrack,
   addClip,
   removeClip,
+  removeClipsByMedia,
   duplicateClip,
   splitClipAtFrame,
   moveClip,
+  moveClipToNewTrack,
+  addMediaToTimeline,
   trimClip,
   updateClip,
   updateClipTransform,

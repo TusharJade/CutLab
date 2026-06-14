@@ -1,16 +1,6 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import type { Clip, MediaAsset } from '../../types'
-import { TRACK_COLOR_VAR } from './timelineConstants'
-
-interface ClipBlockProps {
-  clip: Clip
-  media?: MediaAsset
-  pixelsPerFrame: number
-  isSelected: boolean
-  onSelect: (clipId: string) => void
-  onTrimStart: (event: ReactPointerEvent, clip: Clip, edge: 'left' | 'right') => void
-}
+import type { ClipBlockProps } from '../../utils/types'
+import { TRACK_COLOR_VAR } from '../../utils/constants'
 
 export function ClipBlock({
   clip,

@@ -1,15 +1,8 @@
-import type { EasingType, Keyframe } from '../../types'
+import type { EasingType, Keyframe, KeyframeRowProps } from '../../utils/types'
 import { TrashIcon } from '../icons'
-import { FieldRow, NumberInput, Slider } from '../ui'
+import { FieldRow, NumberInput, Slider } from '../UI'
 
 const EASINGS: EasingType[] = ['linear', 'easeIn', 'easeOut', 'easeInOut']
-
-interface KeyframeRowProps {
-  keyframe: Keyframe
-  maxFrame: number
-  onChange: (changes: Partial<Keyframe>) => void
-  onRemove: () => void
-}
 
 export function KeyframeRow({
   keyframe,

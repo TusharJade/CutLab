@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useSelector } from 'react-redux'
-import { selectClips } from '../../store/selectors'
+import type { RootState } from '../../store/store'
 import { useCompositionProps } from '../../hooks/useCompositionProps'
 import { exportProjectToMp4 } from '../../utils/export'
 import { DownloadIcon, SpinnerIcon } from '../icons'
+
+const selectClips = (state: RootState) => state.project.clips
 
 export function Header() {
   const clips = useSelector(selectClips)

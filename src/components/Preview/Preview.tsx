@@ -1,20 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { Player, type PlayerRef } from '@remotion/player'
-import { useSelector } from 'react-redux'
-import { Main } from '../../remotion/Main'
-import { useAppDispatch } from '../../store/hooks'
-import {
-  selectClips,
-  selectIsPlaying,
-  selectPlayheadFrame,
-} from '../../store/selectors'
+import { useDispatch, useSelector } from 'react-redux'
+import { TimelineComposition } from '../../remotion/TimelineComposition'
+import type { AppDispatch, RootState } from '../../store/store'
 import { setIsPlaying, setPlayheadFrame } from '../../store/slices/editorSlice'
 import { useCompositionProps } from '../../hooks/useCompositionProps'
 import { framesToTimecode } from '../../utils/format'
 import { PauseIcon, PlayIcon } from '../icons'
 
+const selectClips = (state: RootState) => state.project.clips
+const selectPlayheadFrame = (state: RootState) => state.editor.playheadFrame
+const selectIsPlaying = (state: RootState) => state.editor.isPlaying
+
 export function Preview() {
-  const dispatch = useAppDispatch()
+  const dispatch = useDispatch<AppDispatch>()
   const clips = useSelector(selectClips)
   const playheadFrame = useSelector(selectPlayheadFrame)
   const isPlaying = useSelector(selectIsPlaying)
@@ -80,7 +79,7 @@ export function Preview() {
         >
           <Player
             ref={playerRef}
-            component={Main}
+            component={TimelineComposition}
             inputProps={inputProps}
             durationInFrames={durationInFrames}
             compositionWidth={width}

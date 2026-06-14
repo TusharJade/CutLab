@@ -1,9 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { MediaAsset } from '../../types'
-
-interface MediaState {
-  assets: MediaAsset[]
-}
+import type { MediaAsset, MediaState } from '../../utils/types'
 
 const initialState: MediaState = {
   assets: [],

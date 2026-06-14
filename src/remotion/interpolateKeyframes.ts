@@ -1,5 +1,10 @@
 import { Easing, interpolate } from 'remotion'
-import type { EasingType, Keyframe, KeyframeProps } from '../types'
+import type {
+  EasingType,
+  Keyframe,
+  KeyframeProps,
+  ResolvedKeyframeProps,
+} from '../utils/types'
 
 function easingFor(type: EasingType) {
   switch (type) {
@@ -44,13 +49,6 @@ function interpolateProp(
     return pick(keyframes[0].props)
   }
   return pick(keyframes[keyframes.length - 1].props)
-}
-
-export interface ResolvedKeyframeProps {
-  scale: number
-  translateX: number
-  translateY: number
-  opacity: number
 }
 
 export function resolveKeyframeProps(
